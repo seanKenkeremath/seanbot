@@ -24,11 +24,15 @@ def isPoison(tile):
 
 global isWall   
 def isWall(tile):
-    return tileType(tile) == 'wall'
+    return tileType(tile) == 'wood-barrier' or tileType(tile) =='steel-barrier'
 
 global isFog    
 def isFog(tile):
     return tileType(tile) == 'fog'
+    
+global isEnemy
+def isEnemy(tile):
+    return tileType(tile) == 'wombat' or tileType(tile) == 'wood-barrier' or tileType(tile) == 'zakano'
 
 global search
 def search(x, y, ring, maxTile):
@@ -43,7 +47,7 @@ def search(x, y, ring, maxTile):
             fromTile[dx][dy] = backVector
     
     
-    if ring >24:
+    if ring >12:
         return maxTile
         
     global foods
@@ -51,6 +55,7 @@ def search(x, y, ring, maxTile):
     if tileType(searchTile) == 'food':
         print("Food: " + str([x,y]))
         foods.append(maxTile)
+        return [x,y]
         if maxTile == [0,0] or maxTile == coords() or ring < maxTileRing:
             global maxTileRing
             maxTileRing = ring
@@ -113,6 +118,23 @@ def turnToVector(vector):
         return "left"
     return "right"
 
+global pathToTile
+def pathToTile(x, y):
+    path = []
+    currInPath = [x, y]
+    currVector = [0,0]
+    while currInPath != coords():
+
+        print("PATH: " + str([currInPath[0], currInPath[1]]))
+        currVector = fromTile[currInPath[0]][currInPath[1]]
+        currInPath[0] = currInPath[0] + currVector[0]
+        currInPath[1] = currInPath[1] + currVector[1]
+        print("Movement: ")
+        print(currVector)
+        currVector[0] = currVector[0] * -1
+        currVector[1] = currVector[1] * -1
+        path.append(currVector)
+    return path
     
 def wombat(state, time_left):
     global path
@@ -146,6 +168,9 @@ def wombat(state, time_left):
     
     move = [0,0]
 
+    ev = 0
+    points = 20
+    
     if len(path)==0:
         
         targetTile = search(coords()[0], coords()[1], 0, [0,0])
@@ -154,39 +179,46 @@ def wombat(state, time_left):
         print(targetTile)
         log = targetTile
         global command
-        if targetTile == coords() or targetTile == [0,0]:
+        if targetTile == coords() or targetTile == [0,0] or len(targetTile) < 2:
             command = {'action': 'move', 'metadata': {}}
         else:
-    
-            path = []
-            currInPath = [targetTile[0], targetTile[1]]
+            path = pathToTile(targetTile[0], targetTile[1])
 
-            currVector = [0,0]
-            while currInPath != coords():
+    shooting = False
     
-                print("PATH: " + str([currInPath[0], currInPath[1]]))
-                currVector = fromTile[currInPath[0]][currInPath[1]]
-                currInPath[0] = currInPath[0] + currVector[0]
-                currInPath[1] = currInPath[1] + currVector[1]
-                print("Movement: ")
-                print(currVector)
-                currVector[0] = currVector[0] * -1
-                currVector[1] = currVector[1] * -1
-                path.append(currVector)
+    for i in range (1,5):
+        dx = coords()[0] + i * orientation()[0]
+        dy = coords()[1] + i * orientation()[1]
 
-    if len(path) == 0:
-        command = {'action': 'move', 'metadata': {}}
-    else:
-        move = path[0]
-        if orientation() == move:
+        if dx > width -1 or dx < 0 or dy > height -1 or dy < 0:
+            break
+        sightTile = tile(coords()[0] + i * orientation()[0], coords()[1] + i * orientation()[1])
+        if isEnemy(sightTile):
+            command = {'action': 'shoot'}
+            shooting = True
+            break
+    
+    if not shooting:
+        if len(path) == 0:
             command = {'action': 'move', 'metadata': {}}
-            path.pop(0)
+            move = orientation()
         else:
-            command ={'action': 'turn', 'metadata': {'direction': turnToVector(move)}}
+            ev = points/len(path)
+            move = path[0]
+            if orientation() == move:
+                command = {'action': 'move', 'metadata': {}}
+                path.pop(0)
+            else:
+                command ={'action': 'turn', 'metadata': {'direction': turnToVector(move)}}
 
+    frontTile = 0
+    if command['action'] == 'move':
+        frontTile = tile(coords()[0] + move[0], coords()[1] + move[1])
+        if isPoison(frontTile) or isWall(frontTile):
+            command ={'action': 'turn', 'metadata': {'direction': 'right'}}
     return {
         'command': command,
-        'state': {'path': path}
+        'state': {'path': path, 'ev': ev}
     }
 
 width = 7
