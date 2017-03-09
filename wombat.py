@@ -39,7 +39,7 @@ def search(x, y, ring, maxTile):
 
     def valid(coord):
         theTile = tile(coord[0], coord[1])
-        return coord not in searched and coord not in frontier and not isWall(theTile) and not isPoison(theTile) and not isFog(theTile)
+        return coord not in searched and coord not in frontier and not isWall(theTile) and not isPoison(theTile)
 
     def tryAdd(dx, dy, backVector):
         if valid([dx, dy]):
@@ -53,7 +53,6 @@ def search(x, y, ring, maxTile):
     global foods
     searchTile = tile(x, y)
     if tileType(searchTile) == 'food':
-        print("Food: " + str([x,y]))
         foods.append(maxTile)
         return [x,y]
         if maxTile == [0,0] or maxTile == coords() or ring < maxTileRing:
@@ -73,16 +72,8 @@ def search(x, y, ring, maxTile):
         tryAdd(x, y-1, [0, 1])
     if y < height - 1:
         tryAdd(x, y+1, [0, -1])
-    
-    print("Searched: ")
-    print(searched)
-
-    print("Frontier: ")
-    print(frontier)
 
     if len(frontier) == 0:
-        print("Returning")
-        print(maxTile)
         return maxTile
     
     nextTile = frontier.pop(0)
@@ -125,18 +116,26 @@ def pathToTile(x, y):
     currVector = [0,0]
     while currInPath != coords():
 
-        print("PATH: " + str([currInPath[0], currInPath[1]]))
         currVector = fromTile[currInPath[0]][currInPath[1]]
         currInPath[0] = currInPath[0] + currVector[0]
         currInPath[1] = currInPath[1] + currVector[1]
-        print("Movement: ")
-        print(currVector)
         currVector[0] = currVector[0] * -1
         currVector[1] = currVector[1] * -1
         path.append(currVector)
     return path
+
+global turn
+def turn(direction):
+    return {'action': 'turn', 'metadata': {'direction': direction}}
+global moveForward
+def moveForward():
+    return {'action': 'move', 'metadata': {}}
+global shoot
+def shoot():
+    return {'action': 'shoot'}
     
 def wombat(state, time_left):
+    global bored
     global path
     global foods
     global width
@@ -153,14 +152,12 @@ def wombat(state, time_left):
             fromTile[i].append([0,0])
     
     if 'saved-state' in state and state['saved-state']:
-        log = "saved"
         savedState = state['saved-state']
         path = savedState['path']
+        bored = savedState['bored']
     else:
-        log = "not saved"
         path = []
         
-    log = state
     foods = []
     frontier = []
     searched = []
@@ -174,13 +171,10 @@ def wombat(state, time_left):
     if len(path)==0:
         
         targetTile = search(coords()[0], coords()[1], 0, [0,0])
-    
-        print("Result: ")
-        print(targetTile)
-        log = targetTile
+
         global command
         if targetTile == coords() or targetTile == [0,0] or len(targetTile) < 2:
-            command = {'action': 'move', 'metadata': {}}
+            command = moveForward
         else:
             path = pathToTile(targetTile[0], targetTile[1])
 
@@ -194,33 +188,40 @@ def wombat(state, time_left):
             break
         sightTile = tile(coords()[0] + i * orientation()[0], coords()[1] + i * orientation()[1])
         if isEnemy(sightTile):
-            command = {'action': 'shoot'}
+            command = shoot()
             shooting = True
             break
     
     if not shooting:
         if len(path) == 0:
-            command = {'action': 'move', 'metadata': {}}
-            move = orientation()
+            bored +=1
+            if bored > 8:
+                bored = 0
+                command = turn('right')
+            else:
+                command = moveForward()
+                move = orientation()
         else:
+            bored = 0
             ev = points/len(path)
             move = path[0]
             if orientation() == move:
-                command = {'action': 'move', 'metadata': {}}
+                command = moveForward()
                 path.pop(0)
             else:
-                command ={'action': 'turn', 'metadata': {'direction': turnToVector(move)}}
+                command = turn(turnToVector(move))
 
     frontTile = 0
     if command['action'] == 'move':
         frontTile = tile(coords()[0] + move[0], coords()[1] + move[1])
         if isPoison(frontTile) or isWall(frontTile):
-            command ={'action': 'turn', 'metadata': {'direction': 'right'}}
+            command = turn('right')
     return {
         'command': command,
-        'state': {'path': path, 'ev': ev}
+        'state': {'path': path, 'bored': bored}
     }
 
+bored = 0
 width = 7
 height = 7
 
