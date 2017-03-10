@@ -117,7 +117,7 @@ def pathToTile(x, y):
         currInPath[1] = currInPath[1] + currVector[1]
         currVector[0] = currVector[0] * -1
         currVector[1] = currVector[1] * -1
-        path.append(currVector)
+        path.insert(0, currVector)
     return path
 
 global turn
