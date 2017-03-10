@@ -35,7 +35,7 @@ def isEnemy(tile):
     return tileType(tile) == 'wombat' or tileType(tile) == 'wood-barrier' or tileType(tile) == 'zakano'
 
 global search
-def search(x, y, ring, maxTile):
+def search(x, y, maxTile):
 
     def valid(coord):
         theTile = tile(coord[0], coord[1])
@@ -45,22 +45,12 @@ def search(x, y, ring, maxTile):
         if valid([dx, dy]):
             frontier.insert(0, [dx, dy])
             fromTile[dx][dy] = backVector
-    
-    
-    if ring >12:
-        return maxTile
         
-    global foods
     searchTile = tile(x, y)
     if tileType(searchTile) == 'food':
-        foods.append(maxTile)
         return [x,y]
-        if maxTile == [0,0] or maxTile == coords() or ring < maxTileRing:
-            global maxTileRing
-            maxTileRing = ring
-            maxTile[0] = x
-            maxTile[1] = y
-            foods.append(maxTile)
+        if maxTile == [] or maxTile == coords():
+            maxTile = [x,y]
     
     searched.append([x, y])
     
@@ -77,7 +67,7 @@ def search(x, y, ring, maxTile):
         return maxTile
     
     nextTile = frontier.pop(0)
-    return search(nextTile[0], nextTile[1], ring + 1, maxTile)
+    return search(nextTile[0], nextTile[1], maxTile)
 
 global orientation
 def orientation():
@@ -137,14 +127,12 @@ def shoot():
 def wombat(state, time_left):
     global bored
     global path
-    global foods
     global width
     global height
     global currState
     global fromTile
     global searched
     global frontier
-    global maxTileRing
     currState = state
     for i in range(width):
         fromTile.append([])
@@ -158,10 +146,8 @@ def wombat(state, time_left):
     else:
         path = []
         
-    foods = []
     frontier = []
     searched = []
-    maxTileRing = 0
     
     move = [0,0]
 
@@ -170,10 +156,10 @@ def wombat(state, time_left):
     
     if len(path)==0:
         
-        targetTile = search(coords()[0], coords()[1], 0, [0,0])
+        targetTile = search(coords()[0], coords()[1], 0, [])
 
         global command
-        if targetTile == coords() or targetTile == [0,0] or len(targetTile) < 2:
+        if targetTile == coords() or len(targetTile) < 2:
             command = moveForward
         else:
             path = pathToTile(targetTile[0], targetTile[1])
@@ -225,12 +211,9 @@ bored = 0
 width = 7
 height = 7
 
-foods = []
-
 path = []
 
 currState = 0
 frontier = []
 searched = []
 fromTile = []
-maxTileRing = 0
