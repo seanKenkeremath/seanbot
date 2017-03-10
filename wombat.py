@@ -38,20 +38,26 @@ global search
 def search(x, y, maxTile):
 
     def valid(coord):
+        global frontier
+        global searched
         theTile = tile(coord[0], coord[1])
-        return coord not in searched and coord not in frontier and not isWall(theTile) and not isPoison(theTile)
-
+        return coord not in searched and coord not in frontier and not isFog(theTile) and not isWall(theTile) and not isPoison(theTile)
+    
     def tryAdd(dx, dy, backVector):
         if valid([dx, dy]):
-            frontier.insert(0, [dx, dy])
+            global frontier
+            global fromTile
+            frontier.append([dx, dy])
             fromTile[dx][dy] = backVector
         
     searchTile = tile(x, y)
     if tileType(searchTile) == 'food':
         return [x,y]
-        if maxTile == [] or maxTile == coords():
-            maxTile = [x,y]
     
+    global frontier
+    global searched
+    global width
+    global height
     searched.append([x, y])
     
     if x > 0:
@@ -133,12 +139,13 @@ def wombat(state, time_left):
     global fromTile
     global searched
     global frontier
+
     currState = state
     for i in range(width):
         fromTile.append([])
         for j in range(height):
             fromTile[i].append([0,0])
-    
+
     if 'saved-state' in state and state['saved-state']:
         savedState = state['saved-state']
         path = savedState['path']
@@ -149,14 +156,9 @@ def wombat(state, time_left):
     frontier = []
     searched = []
     
-    move = [0,0]
-
-    ev = 0
-    points = 20
-    
     if len(path)==0:
         
-        targetTile = search(coords()[0], coords()[1], 0, [])
+        targetTile = search(coords()[0], coords()[1], [])
 
         global command
         if targetTile == coords() or len(targetTile) < 2:
@@ -179,6 +181,7 @@ def wombat(state, time_left):
             break
     
     if not shooting:
+        move = [0,0]
         if len(path) == 0:
             bored +=1
             if bored > 8:
@@ -189,7 +192,6 @@ def wombat(state, time_left):
                 move = orientation()
         else:
             bored = 0
-            ev = points/len(path)
             move = path[0]
             if orientation() == move:
                 command = moveForward()
@@ -197,9 +199,8 @@ def wombat(state, time_left):
             else:
                 command = turn(turnToVector(move))
 
-    frontTile = 0
+    frontTile = tile(coords()[0] + orientation()[0], coords()[1] + orientation()[1])
     if command['action'] == 'move':
-        frontTile = tile(coords()[0] + move[0], coords()[1] + move[1])
         if isPoison(frontTile) or isWall(frontTile):
             command = turn('right')
     return {
