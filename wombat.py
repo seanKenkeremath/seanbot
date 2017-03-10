@@ -53,7 +53,9 @@ def search(x, y, maxTile):
     searchTile = tile(x, y)
     if tileType(searchTile) == 'food':
         return [x,y]
-    
+    elif tileType(searchTile) == 'zakano' or tileType(searchTile) == 'wombat':
+        maxTile = [x,y]
+        
     global frontier
     global searched
     global width
