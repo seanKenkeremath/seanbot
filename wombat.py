@@ -1,3 +1,15 @@
+log = {}
+bored = 0
+width = 7
+height = 7
+path = []
+targetCoords = []
+targetTile = 0
+currState = 0
+frontier = []
+searched = []
+fromTile = []
+
 global arena
 def arena():
     return currState['arena']
@@ -24,7 +36,15 @@ def isPoison(tile):
 
 global isWall   
 def isWall(tile):
-    return tileType(tile) == 'wood-barrier' or tileType(tile) =='steel-barrier'
+    return isWoodWall(tile) or tileType(tile) =='steel-barrier'
+
+global isWoodWall
+def isWoodWall(tile):
+    return tileType(tile) == 'wood-barrier'
+
+global isOtherWombat
+def isOtherWombat(x, y, tile):
+    return tileType(tile) == 'wombat' and [x,y] != coords()
 
 global isFog    
 def isFog(tile):
@@ -35,11 +55,33 @@ def isSmoke(tile):
     return tileType(tile) == 'smoke'
 
 global isEnemy
-def isEnemy(tile):
-    return tileType(tile) == 'wombat' or tileType(tile) == 'wood-barrier' or tileType(tile) == 'zakano'
+def isEnemy(x, y, tile):
+    return isOtherWombat(x, y, tile) or isWoodWall(tile) or tileType(tile) == 'zakano'
+
+global tileValue
+def tileValue(x, y, tile):
+    if tileType(tile) == 'food':
+        return 5
+    elif tileType(tile) == 'zakano':
+        return 2
+    elif isOtherWombat(x, y, tile):
+        #TODO check HP and factor in chance of killing vs chance of moving away
+        return 3
+    elif isWoodWall(tile):
+        return 1.5
+    return 0
+
+global tileEv
+def tileEv(x, y, tile):
+    evPathToTile = pathToTile(x, y)
+    evTileValue = tileValue(x, y, tile)
+    evPathTime = pathTime(evPathToTile, [x,y], orientation())
+    if evPathTime == 0:
+        return 0
+    return evTileValue/float(evPathTime)
 
 global search
-def search(x, y, maxTile):
+def search(x, y, maxTile, maxEv):
 
     def valid(coord):
         global frontier
@@ -55,9 +97,10 @@ def search(x, y, maxTile):
             fromTile[dx][dy] = backVector
         
     searchTile = tile(x, y)
-    if tileType(searchTile) == 'food':
-        return [x,y]
-    elif tileType(searchTile) == 'zakano' or tileType(searchTile) == 'wombat':
+    searchTileEv = tileEv(x, y, searchTile)
+
+    if searchTileEv > maxEv or maxTile == []:
+        maxEv = searchTileEv
         maxTile = [x,y]
         
     global frontier
@@ -79,7 +122,7 @@ def search(x, y, maxTile):
         return maxTile
     
     nextTile = frontier.pop(0)
-    return search(nextTile[0], nextTile[1], maxTile)
+    return search(nextTile[0], nextTile[1], maxTile, maxEv)
 
 global orientation
 def orientation():
@@ -113,18 +156,32 @@ def turnToVector(vector):
 
 global pathToTile
 def pathToTile(x, y):
-    path = []
+    buildPath = []
     currInPath = [x, y]
     currVector = [0,0]
     while currInPath != coords():
 
         currVector = fromTile[currInPath[0]][currInPath[1]]
+        currVector = [currVector[0], currVector[1]]
         currInPath[0] = currInPath[0] + currVector[0]
         currInPath[1] = currInPath[1] + currVector[1]
         currVector[0] = currVector[0] * -1
         currVector[1] = currVector[1] * -1
-        path.insert(0, currVector)
-    return path
+        buildPath.insert(0, currVector)
+    return buildPath
+
+global pathTime
+def pathTime(path, tileCoords, currDirection):
+    totalTime = 0
+    for i in range(0, len(path)):
+        totalTime += 1
+        if currDirection != path[i]:
+            totalTime += 1
+            currDirection = path[i]
+    if isEnemy(tileCoords[0], tileCoords[1], tile(tileCoords[0], tileCoords[1])):
+        # Add a turn to account for shooting
+        totalTime += 1
+    return totalTime
 
 global turn
 def turn(direction):
@@ -139,14 +196,16 @@ def shoot():
 def wombat(state, time_left):
     global bored
     global path
+    global targetCoords
     global targetTile
-    global targetType
     global width
     global height
     global currState
     global fromTile
     global searched
     global frontier
+    global command
+    global log
 
     currState = state
     for i in range(width):
@@ -157,36 +216,43 @@ def wombat(state, time_left):
     if 'saved-state' in state and state['saved-state']:
         savedState = state['saved-state']
         path = savedState['path']
-        targetTile = savedState['target']
-        targetType = savedState['targetType']
+        targetCoords = savedState['targetCoords']
+        targetTile = savedState['targetTile']
         bored = savedState['bored']
     else:
         path = []
-        targetTile = []
-        targetType = '';
+        targetCoords = []
+        targetTile = 0;
         
     frontier = []
     searched = []
     
-    #If we have no path, or our target is no longer valid. 
-    #Fog and smoke still count as valid because target is probably still there
-    currTargetTile = 0
-    if len(targetTile) > 1:
-        currTargetTile = tile(targetTile[0], targetTile[1])
 
-    if len(path)==0 or len(targetTile) < 2 or (tileType(currTargetTile) != targetType and not isSmoke(currTargetTile) and not isFog(currTargetTile)):
-        
-        targetTile = search(coords()[0], coords()[1], [])
-        targetType = tileType(tile(targetTile[0], targetTile[1]))
-        global command
-        if targetTile == coords() or len(targetTile) < 2:
-            command = moveForward
-        else:
-            path = pathToTile(targetTile[0], targetTile[1])
+    #Calculate ev of our stored target using the remainder of our saved path
+    currTargetTile = 0
+    targetEv = 0
+    if len(targetCoords) > 1 and len(path) > 0:
+        currTargetTile = tile(targetCoords[0], targetCoords[1])
+        targetEv = tileValue(targetCoords[0], targetCoords[1], targetTile)/float(pathTime(path, targetCoords, orientation()))
+
+    #Perform search and calculate ev of max value target
+    newTargetCoords = search(coords()[0], coords()[1], [], 0)
+    newTargetTile = tile(newTargetCoords[0], newTargetCoords[1])
+    newTargetEv = tileEv(newTargetCoords[0], newTargetCoords[1], newTargetTile)
+
+    log['targetEv'] = targetEv
+    log['newSearchEv'] = newTargetEv
+
+    #If we have no path, we see something more valuable, or our target is no longer valid. 
+    #Fog and smoke still count as valid because target is probably still there
+    if len(path) == 0 or len(targetCoords) < 2 or newTargetEv > targetEv or (tileType(currTargetTile) != tileType(targetTile) and not isSmoke(currTargetTile) and not isFog(currTargetTile)):
+        targetCoords = newTargetCoords
+        targetTile = newTargetTile
+        if targetCoords != coords() and len(targetCoords) > 1:
+            path = pathToTile(targetCoords[0], targetCoords[1])
 
     #If there is something right in front of us, shoot
     shooting = False
-    
     for i in range (1,5):
         dx = coords()[0] + i * orientation()[0]
         dy = coords()[1] + i * orientation()[1]
@@ -194,7 +260,7 @@ def wombat(state, time_left):
         if dx > width -1 or dx < 0 or dy > height -1 or dy < 0:
             break
         sightTile = tile(coords()[0] + i * orientation()[0], coords()[1] + i * orientation()[1])
-        if isEnemy(sightTile):
+        if isEnemy(dx, dy, sightTile):
             command = shoot()
             shooting = True
             break
@@ -227,17 +293,5 @@ def wombat(state, time_left):
             command = turn('right')
     return {
         'command': command,
-        'state': {'path': path, 'target': targetTile, 'targetType': targetType, 'bored': bored}
+        'state': {'path': path, 'targetCoords': targetCoords, 'targetTile': targetTile, 'bored': bored, 'log': log}
     }
-
-bored = 0
-width = 7
-height = 7
-
-path = []
-targetTile = []
-targetType = ''
-currState = 0
-frontier = []
-searched = []
-fromTile = []
