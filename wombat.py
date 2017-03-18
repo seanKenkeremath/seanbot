@@ -29,7 +29,11 @@ def isWall(tile):
 global isFog    
 def isFog(tile):
     return tileType(tile) == 'fog'
-    
+
+global isSmoke
+def isSmoke(tile):
+    return tileType(tile) == 'smoke'
+
 global isEnemy
 def isEnemy(tile):
     return tileType(tile) == 'wombat' or tileType(tile) == 'wood-barrier' or tileType(tile) == 'zakano'
@@ -135,6 +139,8 @@ def shoot():
 def wombat(state, time_left):
     global bored
     global path
+    global targetTile
+    global targetType
     global width
     global height
     global currState
@@ -151,23 +157,34 @@ def wombat(state, time_left):
     if 'saved-state' in state and state['saved-state']:
         savedState = state['saved-state']
         path = savedState['path']
+        targetTile = savedState['target']
+        targetType = savedState['targetType']
         bored = savedState['bored']
     else:
         path = []
+        targetTile = []
+        targetType = '';
         
     frontier = []
     searched = []
     
-    if len(path)==0:
+    #If we have no path, or our target is no longer valid. 
+    #Fog and smoke still count as valid because target is probably still there
+    currTargetTile = 0
+    if len(targetTile) > 1:
+        currTargetTile = tile(targetTile[0], targetTile[1])
+
+    if len(path)==0 or len(targetTile) < 2 or (tileType(currTargetTile) != targetType and not isSmoke(currTargetTile) and not isFog(currTargetTile)):
         
         targetTile = search(coords()[0], coords()[1], [])
-
+        targetType = tileType(tile(targetTile[0], targetTile[1]))
         global command
         if targetTile == coords() or len(targetTile) < 2:
             command = moveForward
         else:
             path = pathToTile(targetTile[0], targetTile[1])
 
+    #If there is something right in front of us, shoot
     shooting = False
     
     for i in range (1,5):
@@ -184,6 +201,7 @@ def wombat(state, time_left):
     
     if not shooting:
         move = [0,0]
+        #If we have no path, just start moving forward for a while
         if len(path) == 0:
             bored +=1
             if bored > 8:
@@ -192,6 +210,7 @@ def wombat(state, time_left):
             else:
                 command = moveForward()
                 move = orientation()
+        #Move along the path, turn if necessary
         else:
             bored = 0
             move = path[0]
@@ -201,13 +220,14 @@ def wombat(state, time_left):
             else:
                 command = turn(turnToVector(move))
 
+    #If we're about to move into a wall or poison, turn right. this should only happen when no path
     frontTile = tile(coords()[0] + orientation()[0], coords()[1] + orientation()[1])
     if command['action'] == 'move':
         if isPoison(frontTile) or isWall(frontTile):
             command = turn('right')
     return {
         'command': command,
-        'state': {'path': path, 'bored': bored}
+        'state': {'path': path, 'target': targetTile, 'targetType': targetType, 'bored': bored}
     }
 
 bored = 0
@@ -215,7 +235,8 @@ width = 7
 height = 7
 
 path = []
-
+targetTile = []
+targetType = ''
 currState = 0
 frontier = []
 searched = []
