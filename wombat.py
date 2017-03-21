@@ -9,6 +9,7 @@ currState = 0
 frontier = []
 searched = []
 fromTile = []
+shotDamage = 10
 
 global arena
 def arena():
@@ -46,6 +47,13 @@ global isOtherWombat
 def isOtherWombat(x, y, tile):
     return tileType(tile) == 'wombat' and [x,y] != coords()
 
+global hp
+def hp(tile):
+    if 'contents' in tile.keys():
+        if 'hp' in tile['contents'].keys():
+            return tile['contents']['hp']
+    return 0
+
 global isFog    
 def isFog(tile):
     return tileType(tile) == 'fog'
@@ -60,12 +68,24 @@ def isEnemy(x, y, tile):
 
 global tileValue
 def tileValue(x, y, tile):
+
+    global shotDamage
+
     if tileType(tile) == 'food':
+        if hp(playerTile()) < shotDamage * 2:
+            return 16
         return 5
     elif tileType(tile) == 'zakano':
+        if hp(tile) <= shotDamage:
+            return 10
+        elif hp(tile) <= shotDamage*2:
+            return 4
         return 2
     elif isOtherWombat(x, y, tile):
-        #TODO check HP and factor in chance of killing vs chance of moving away
+        if hp(tile) <= shotDamage:
+            return 15
+        elif hp(tile) <= shotDamage*2:
+            return 7
         return 3
     elif isWoodWall(tile):
         return 1.5
@@ -206,6 +226,7 @@ def wombat(state, time_left):
     global frontier
     global command
     global log
+    global shotDamage
 
     currState = state
     for i in range(width):
@@ -251,6 +272,10 @@ def wombat(state, time_left):
         if targetCoords != coords() and len(targetCoords) > 1:
             path = pathToTile(targetCoords[0], targetCoords[1])
 
+    if len(targetCoords) > 1:
+        log['targetHp'] = hp(targetTile) 
+        log['targetValue'] = tileValue(targetCoords[0], targetCoords[1], targetTile)
+
     #If there is something right in front of us, shoot
     shooting = False
     for i in range (1,5):
@@ -260,7 +285,9 @@ def wombat(state, time_left):
         if dx > width -1 or dx < 0 or dy > height -1 or dy < 0:
             break
         sightTile = tile(coords()[0] + i * orientation()[0], coords()[1] + i * orientation()[1])
-        if isEnemy(dx, dy, sightTile):
+
+        #Shoot if there's something in front, but only shoot at wall if you ahve nothing else to do
+        if isEnemy(dx, dy, sightTile) and not (len(path) > 0 and isWall(sightTile)):
             command = shoot()
             shooting = True
             break
