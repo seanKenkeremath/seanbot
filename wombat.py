@@ -82,7 +82,9 @@ def tileValue(x, y, tile):
             return 8
         return 2
     elif isOtherWombat(x, y, tile):
-        if hp(tile) <= shotDamage:
+        if hp(playerTile()) < hp(tile):
+            return 7
+        elif hp(tile) <= shotDamage:
             return 25
         elif hp(tile) <= shotDamage*2:
             return 13
