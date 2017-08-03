@@ -73,19 +73,19 @@ def tileValue(x, y, tile):
 
     if tileType(tile) == 'food':
         if hp(playerTile()) < shotDamage * 2:
-            return 16
-        return 5
+            return 26
+        return 10
     elif tileType(tile) == 'zakano':
-        if hp(tile) <= shotDamage:
-            return 10
-        elif hp(tile) <= shotDamage*2:
-            return 4
-        return 2
-    elif isOtherWombat(x, y, tile):
         if hp(tile) <= shotDamage:
             return 15
         elif hp(tile) <= shotDamage*2:
-            return 7
+            return 8
+        return 2
+    elif isOtherWombat(x, y, tile):
+        if hp(tile) <= shotDamage:
+            return 25
+        elif hp(tile) <= shotDamage*2:
+            return 13
         return 3
     elif isWoodWall(tile):
         return 1.5
