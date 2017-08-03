@@ -95,7 +95,7 @@ def tileValue(x, y, tile):
         return 3
     elif isWoodWall(tile):
         return 1.5
-    elif isSteelWall(tile) && hp(tile) <= shotDamage * 4:
+    elif isSteelWall(tile) and hp(tile) <= shotDamage * 4:
         return 25
     return 0
 
