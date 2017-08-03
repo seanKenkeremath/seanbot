@@ -43,6 +43,10 @@ global isWoodWall
 def isWoodWall(tile):
     return tileType(tile) == 'wood-barrier'
 
+global isSteelWall
+def isSteelWall(tile):
+    return tileType(tile) == 'steel-barrier'
+
 global isOtherWombat
 def isOtherWombat(x, y, tile):
     return tileType(tile) == 'wombat' and [x,y] != coords()
@@ -91,6 +95,8 @@ def tileValue(x, y, tile):
         return 3
     elif isWoodWall(tile):
         return 1.5
+    elif isSteelWall(tile) && hp(tile) <= shotDamage * 4:
+        return 25
     return 0
 
 global tileEv
